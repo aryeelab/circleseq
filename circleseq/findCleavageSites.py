@@ -26,8 +26,13 @@ def tabulate_merged_start_positions(BamFileName, cells, name, targetsite, mapq_t
     ga_coverage = HTSeq.GenomicArray("auto", stranded=False)
 
     read_count = 0
+<<<<<<< HEAD
     ref_chr = [str(x) for x in range(1, 23)] + ['X', 'Y'] + [''.join(['chr',str(x)]) for x in range(1, 23)] + \
               ['chrX', 'chrY'] + ['chrHHH'] + ['2R', '3R', '2L', '3L', 'X', 'Y_unplaced', 'NM4g4']
+=======
+
+    pattern = regex.compile("^(chr|[0-9XY])")
+>>>>>>> upstream/dev
 
     with open(output_filename, 'w') as o:
         header = ['#Name', 'Targetsite_Sequence', 'Cells', 'BAM', 'Read1_chr', 'Read1_start_position', 'Read1_strand',
@@ -64,7 +69,7 @@ def tabulate_merged_start_positions(BamFileName, cells, name, targetsite, mapq_t
                             second_read_position = cigar_operation.ref_iv.start + distance
                             second_read_strand = '+'
 
-                if (first_read_chr == second_read_chr and first_read_chr in ref_chr and
+                if (first_read_chr == second_read_chr and pattern.match(str(first_read_chr)) and
                             first_read_position is not None and second_read_position is not None):
                     if abs(first_read_position - second_read_position) <= gap_threshold:
                         output = True
@@ -86,6 +91,7 @@ def tabulate_merged_start_positions(BamFileName, cells, name, targetsite, mapq_t
 
     return ga, ga_windows, ga_stranded, ga_coverage, read_count
 
+<<<<<<< HEAD
 
 """ Tabulate the start positions for the 2nd read in pair across the genome.
     Only consider alignments with matching positions from the beginning of the read.
@@ -190,6 +196,8 @@ def tabulate_start_positions(BamFileName, cells, name, targetsite, mapq_threshol
                 print(read_count/float(1000000), end=" ", file=sys.stderr)
 
     return ga, ga_windows, ga_stranded, ga_coverage, read_count
+=======
+>>>>>>> upstream/dev
 
 """ Find genomic windows (coordinate positions)
 """
@@ -522,15 +530,26 @@ def get_sequence(reference_genome, chromosome, start, end, strand="+"):
     return str(seq)
 
 
+<<<<<<< HEAD
 def compare(ref, bam, control, targetsite, windowsize, mapq_threshold, gap_threshold, start_threshold, mismatch_threshold, name,
             cells, out, merged=False):
+=======
+def compare(ref, bam, control, targetsite, reads, windowsize, mapq_threshold, gap_threshold, start_threshold, mismatch_threshold, name,
+            cells, out, merged=True):
+>>>>>>> upstream/dev
 
     output_list = list()
 
     reference_genome = pyfaidx.Fasta(ref)
+<<<<<<< HEAD
     combined_ga = HTSeq.GenomicArray("auto", stranded=False)  # Store the union of control and nuclease positions
     offtarget_ga_windows = HTSeq.GenomicArray("auto", stranded=False)  # Store potential off-target sites
     ga_narrow_windows = HTSeq.GenomicArray("auto", stranded=False)  # Store potential off-target sites narrow windows read counts
+=======
+    combined_ga = HTSeq.GenomicArray("auto", stranded=False) # Store the union of control and nuclease positions
+    offtarget_ga_windows = HTSeq.GenomicArray("auto", stranded=False) # Store potential off-target sites
+    ga_narrow_windows = HTSeq.GenomicArray("auto", stranded=False) # Store potential off-target sites narrow windows read counts
+>>>>>>> upstream/dev
 
     bg_position = list()  # List to store nuclease_position_counts that were observed at least once
     bg_narrow = list()  # List to store the sum of nuclease_position_counts in the narrow window
@@ -551,6 +570,7 @@ def compare(ref, bam, control, targetsite, windowsize, mapq_threshold, gap_thres
             control_ga, control_ga_windows, control_ga_stranded, control_ga_coverage, total_control_count = \
                 tabulate_merged_start_positions(control, cells, name, targetsite, mapq_threshold, gap_threshold,
                                                 start_threshold, out + '_CONTROL')
+<<<<<<< HEAD
         else:
             print("Tabulate nuclease standard start positions.", file=sys.stderr)
             nuclease_ga, nuclease_ga_windows, nuclease_ga_stranded, nuclease_ga_coverage, total_nuclease_count = \
@@ -558,6 +578,17 @@ def compare(ref, bam, control, targetsite, windowsize, mapq_threshold, gap_thres
             print("Tabulate control standard start positions.", file=sys.stderr)
             control_ga, control_ga_windows, control_ga_stranded, control_ga_coverage, total_control_count = \
                 tabulate_start_positions(control, cells, name, targetsite, mapq_threshold, gap_threshold, out + '_CONTROL')
+=======
+        # else:
+        #     print("Tabulate nuclease standard start positions.", file=sys.stderr)
+        #     nuclease_ga, nuclease_ga_windows, nuclease_ga_stranded, nuclease_ga_coverage, total_nuclease_count = \
+        #         tabulate_start_positions(bam, cells, name, targetsite, mapq_threshold, gap_threshold,
+        #                                         start_threshold, out + '_NUCLEASE')
+        #     print("Tabulate control standard start positions.", file=sys.stderr)
+        #     control_ga, control_ga_windows, control_ga_stranded, control_ga_coverage, total_control_count = \
+        #         tabulate_start_positions(control, cells, name, targetsite, mapq_threshold, gap_threshold,
+        #                                         start_threshold, out + '_CONTROL')
+>>>>>>> upstream/dev
 
         # For all positions with detected read mapping positions, put into a combined genomicArray
         for iv, value in nuclease_ga.steps():
@@ -574,6 +605,12 @@ def compare(ref, bam, control, targetsite, windowsize, mapq_threshold, gap_thres
                     window = HTSeq.GenomicInterval(position.chrom, max(0, position.pos - windowsize),
                                                    position.pos + windowsize + 1)
 
+<<<<<<< HEAD
+=======
+                    one_k_window = HTSeq.GenomicInterval(position.chrom, max(0, position.pos - 500),
+                                                         position.pos + windowsize + 500)
+
+>>>>>>> upstream/dev
                     # Start mapping positions, at the specific base position
                     nuclease_position_counts = nuclease_ga[position]
                     control_position_counts = control_ga[position]
@@ -584,18 +621,33 @@ def compare(ref, bam, control, targetsite, windowsize, mapq_threshold, gap_thres
                     # In the narrow (parameter-specified) window
                     nuclease_window_counts = sum(nuclease_ga[window])
                     control_window_counts = sum(control_ga[window])
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream/dev
                     # Store control_window_counts greater than zero
                     if control_window_counts >= 0:
                         bg_narrow.append(control_window_counts)
 
                     # A list of the outputs
                     row = [position.chrom, position.pos, nuclease_position_counts, control_position_counts,
+<<<<<<< HEAD
                            nuclease_window_counts, control_window_counts]
+=======
+                           nuclease_window_counts, control_window_counts, nuclease_one_k_window_counts,
+                           control_one_k_window_counts]
+>>>>>>> upstream/dev
                     output_list.append(row)
 
         print('#Chromosome', 'zero_based_Position', 'Nuclease_Position_Reads', 'Control_Position_Reads',
               'Nuclease_Window_Reads', 'Control_Window_Reads',
+<<<<<<< HEAD
               'p_Value', 'narrow_p_Value', 'control_p_Value', 'control_narrow_p_Value', file=o, sep='\t')
+=======
+              'Nuclease_1k_Window_Reads', 'Control_1k_Window_Reads',
+              'p_Value', 'narrow_p_Value', 'one_k_p_Value',
+              'control_p_Value', 'control_narrow_p_Value','control_one_k_p_Value', file=o, sep='\t')
+>>>>>>> upstream/dev
 
         # Empiricals cdf
         ecdf_pos = statsmodels.distributions.empirical_distribution.ECDF(bg_position)
