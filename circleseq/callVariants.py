@@ -8,7 +8,7 @@ import regex
 import re
 import HTSeq
 import pyfaidx
-from findCleavageSites import get_sequence, regexFromSequence, alignSequences, reverseComplement, extendedPattern, realignedSequences
+from findCleavageSites import get_sequence, regexFromSequence, alignSequences, reverseComplement #, extendedPattern, realignedSequences
 
 
 """
