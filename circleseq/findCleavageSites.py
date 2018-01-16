@@ -7,6 +7,8 @@ import pyfaidx
 import regex
 import statsmodels
 import sys
+import string
+import nwalign as nw
 
 
 """ Tabulate merged start positions.
@@ -222,80 +224,49 @@ def output_alignments(narrow_ga, ga_windows, reference_genome, target_sequence, 
         if value:
             window_sequence = get_sequence(reference_genome, iv.chrom, iv.start - search_radius, iv.end + search_radius)
 
-            offtarget_sequence_no_bulge, mismatches, offtarget_sequence_length, chosen_alignment_strand_m, start_no_bulge, end_no_bulge, \
-            realigned_target, \
-            bulged_offtarget_sequence, length, score, substitutions, insertions, deletions, chosen_alignment_strand_b, bulged_start, bulged_end = \
-                alignSequences(target_sequence, window_sequence, max_score=mismatch_threshold)
+            sequence, distance, length, strand, target_start_relative, target_end_relative, realigned_target = \
+                alignSequences(target_sequence, window_sequence, max_errors=mismatch_threshold)
 
             # get genomic coordinates of sequences
-            mm_start, mm_end, b_start, b_end = '', '', '', ''
-            if offtarget_sequence_no_bulge and chosen_alignment_strand_m == '+':
-                mm_start = iv.start - search_radius + int(start_no_bulge)
-                mm_end = iv.start - search_radius + int(end_no_bulge)
-            if offtarget_sequence_no_bulge and chosen_alignment_strand_m == '-':
-                mm_start = iv.end + search_radius - int(end_no_bulge)
-                mm_end = iv.end + search_radius - int(start_no_bulge)
-
-            if bulged_offtarget_sequence and chosen_alignment_strand_b == '+':
-                b_start = iv.start - search_radius + int(bulged_start)
-                b_end = iv.start - search_radius + int(bulged_end)
-            if bulged_offtarget_sequence and chosen_alignment_strand_b == '-':
-                b_start = iv.end + search_radius - int(bulged_end)
-                b_end = iv.end + search_radius - int(bulged_start)
-
-            #  define overall start, end and strand. For bed annotation purposes
-            if offtarget_sequence_no_bulge:
-                target_start_absolute = mm_start
-                target_end_absolute = mm_end
-                target_strand_absolute = chosen_alignment_strand_m
-            elif not offtarget_sequence_no_bulge and bulged_offtarget_sequence:
-                target_start_absolute = b_start
-                target_end_absolute = b_end
-                target_strand_absolute = chosen_alignment_strand_b
+            if strand == "+":
+                target_start_absolute = target_start_relative + iv.start - search_radius
+                target_end_absolute = target_end_relative + iv.start - search_radius
+            elif strand == "-":
+                target_start_absolute = iv.end + search_radius - target_end_relative
+                target_end_absolute = iv.end + search_radius - target_start_relative
             else:
                 target_start_absolute = iv.start
                 target_end_absolute = iv.end
-                target_strand_absolute = '*'
 
             name = iv.chrom + ':' + str(target_start_absolute) + '-' + str(target_end_absolute)
             read_count = int(max(set(narrow_ga[iv])))
             filename = os.path.basename(bam_filename)
             full_name = str(target_name) + '_' + str(target_cells) + '_' + str(name) + '_' + str(read_count)
 
-            if offtarget_sequence_no_bulge or bulged_offtarget_sequence:
+            if sequence:
                 tag = iv.chrom + ':' + str(target_start_absolute)
                 if tag not in reads_dict.keys():
                     reads_dict[tag] = read_count
                     window_min[tag] = [iv.start]
                     window_max[tag] = [iv.end]
-                    matched_dict[tag] = [iv.chrom, target_start_absolute, target_end_absolute, name, read_count, target_strand_absolute,
-                                         iv.start, iv.end, iv, window_sequence,
-                                         offtarget_sequence_no_bulge, mismatches,
-                                         chosen_alignment_strand_m, mm_start, mm_end,
-                                         bulged_offtarget_sequence, length, score, substitutions, insertions, deletions,
-                                         chosen_alignment_strand_b, b_start, b_end,
-                                         filename, target_cells, target_name, full_name, target_sequence, realigned_target]
+                    matched_dict[tag] = [iv.chrom, target_start_absolute, target_end_absolute, name, read_count, strand,
+                                         iv, iv.chrom, iv.start, iv.end, window_sequence, sequence, distance, length,
+                                         filename, target_name, target_cells, full_name, target_sequence,
+                                         realigned_target]
                 else:
                     current_read_count = reads_dict[tag]
-                    reads_dict[tag] = max(current_read_count, read_count) 
+                    reads_dict[tag] = max(current_read_count, read_count)
                     window_min[tag].append(iv.start)
                     window_max[tag].append(iv.end)
-                    matched_dict[tag] = [iv.chrom, target_start_absolute, target_end_absolute, name, read_count, target_strand_absolute,
-                                         min(window_min[tag]), max(window_max[tag]), iv, window_sequence,
-                                         offtarget_sequence_no_bulge, mismatches,
-                                         chosen_alignment_strand_m, mm_start, mm_end,
-                                         bulged_offtarget_sequence, length, score, substitutions, insertions, deletions,
-                                         chosen_alignment_strand_b, b_start, b_end,
-                                         filename, target_cells, target_name, full_name, target_sequence, realigned_target]
+                    matched_dict[tag] = [iv.chrom, target_start_absolute, target_end_absolute, name, reads_dict[tag],
+                                         strand, iv, iv.chrom, min(window_min[tag]), max(window_max[tag]),
+                                         window_sequence, sequence, distance, length, filename, target_name,
+                                         target_cells, full_name, target_sequence, realigned_target]
             else:
                 untag = iv.chrom + ':' + str(iv.start)
-                unmatched_dict[untag] = [iv.chrom, target_start_absolute, target_end_absolute, name, read_count, target_strand_absolute,
-                                         iv.start, iv.end, iv, window_sequence,
-                                         offtarget_sequence_no_bulge, mismatches,
-                                         chosen_alignment_strand_m, mm_start, mm_end,
-                                         bulged_offtarget_sequence, length, score, substitutions, insertions, deletions,
-                                         chosen_alignment_strand_b, b_start, b_end,
-                                         filename, target_cells, target_name, full_name, target_sequence, 'none']
+                unmatched_dict[untag] = [iv.chrom, target_start_absolute, target_end_absolute, name, read_count, strand,
+                                         iv, iv.chrom, iv.start, iv.end, window_sequence, sequence, distance, length,
+                                         filename, target_name, target_cells, full_name, target_sequence, 'none']
 
     # Write matched table
     print("Writing matched table", file=sys.stderr)
@@ -305,14 +276,10 @@ def output_alignments(narrow_ga, ga_windows, reference_genome, target_sequence, 
 
     o1 = open(outfile_matched, 'w')
     print('Chromosome', 'Start', 'End', 'Name', 'ReadCount', 'Strand'  # 0:5
-          'PositionStart', 'PositionEnd', 'WindowName', 'WindowSequence',  # 6:9
-          'Site_SubstitutionsOnly.Sequence', 'Site_SubstitutionsOnly.NumSubstitutions',  # 10:11
-          'Site_SubstitutionsOnly.Strand', 'Site_SubstitutionsOnly.Start', 'Site_SubstitutionsOnly.End',  # 12:14
-          'Site_GapsAllowed.Sequence', 'Site_GapsAllowed.Length', 'Site_GapsAllowed.Score',  # 15:17
-          'Site_GapsAllowed.Substitutions', 'Site_GapsAllowed.Insertions', 'Site_GapsAllowed.Deletions',  # 18:20
-          'Site_GapsAllowed.Strand', 'Site_GapsAllowed.Start', 'Site_GapsAllowed.End',  #21:23
-          'FileName', 'Cell', 'Targetsite', 'FullName', 'TargetSequence', 'RealignedTargetSequence',  # 24:29
-          'Position.Pvalue', 'Narrow.Pvalue', 'Position.Control.Pvalue', 'Narrow.Control.Pvalue',  # 30:33
+          'WindowName', 'WindowChromosome', 'PositionStart', 'PositionEnd', 'WindowSequence',  # 6:10
+          'Site.Sequence', 'Site.Distance',  'Site.Length',  # 11:13
+          'FileName', 'Cell', 'Targetsite', 'FullName', 'TargetSequence', 'RealignedTargetSequence',  # 14:19
+          'Position.Pvalue', 'Narrow.Pvalue', 'Position.Control.Pvalue', 'Narrow.Control.Pvalue',  # 20:23
           sep='\t', file=o1)
     o1.close()
 
@@ -403,114 +370,54 @@ def regexFromSequence(seq, lookahead=True, indels=1, errors=7):
     return pattern_standard, pattern_gap
 
 """
-Allow for '-' in our search. 
-"""
-def extendedPattern(seq, errors, indels=1):
-    IUPAC_notation_regex_extended = {'N': '[ATCGN]','-': '[ATCGN]','Y': '[CTY]','R': '[AGR]','W': '[ATW]','S': '[CGS]','A': 'A','T': 'T','C': 'C','G': 'G'}
-    realign_pattern = ''
-    for c in seq:
-        realign_pattern += IUPAC_notation_regex_extended[c]
-    return '(?b:' + realign_pattern + ')' + '{{i<={0},d<={0},s<={1},3i+3d+1s<={1}}}'.format(indels, errors)
-
-"""
-Recreate 'an' sequence in the window_sequence that matches the conditions given for the fuzzy regex. 
-"""
-def realignedSequences(targetsite_sequence, chosen_alignment, errors):
-    match_sequence = chosen_alignment.group()
-    substitutions, insertions, deletions = chosen_alignment.fuzzy_counts
-
-    # get the .fuzzy_counts associated to the matching sequence after adjusting for indels, where 0 <= INS, DEL <= 1
-    realigned_fuzzy = (substitutions, max(0, insertions - 1), max(0, deletions - 1))
-
-    if insertions:  # DNA-bulge
-        targetsite_realignments = [targetsite_sequence[:i] + '-' + targetsite_sequence[i:] for i in range(1, len(targetsite_sequence))]
-    else:
-        targetsite_realignments = [targetsite_sequence]
-
-    realigned_target_sequence, realigned_offtarget_sequence = None, ''  # in case the matching sequence is not founded
-
-    for seq in targetsite_realignments:
-        if deletions:  # RNA-bulge
-            match_realignments = [match_sequence[:i + 1] + '-' + match_sequence[i + 1:] for i in range(len(match_sequence) - 1)]
-            match_pattern = [match_sequence[:i + 1] + seq[i + 1] + match_sequence[i + 1:] for i in range(len(match_sequence) - 1)]
-        else:
-            match_realignments = match_pattern = [match_sequence]
-
-        x = extendedPattern(seq, errors)
-        for y_pattern, y_alignment in zip(match_pattern, match_realignments):
-            m = regex.search(x, y_pattern, regex.BESTMATCH)
-            if m and m.fuzzy_counts == realigned_fuzzy:
-                realigned_target_sequence, realigned_offtarget_sequence = seq, y_alignment
-    return realigned_target_sequence, realigned_offtarget_sequence
-
-
-"""
 Given a targetsite and window, use a fuzzy regex to align the targetsite to
 the window. Returns the best match(es).
 """
 def alignSequences(targetsite_sequence, window_sequence, max_score=7):
-
     window_sequence = window_sequence.upper()
+    # Try both strands
     query_regex_standard, query_regex_gap = regexFromSequence(targetsite_sequence, errors=max_score)
 
-    # Try both strands
-    alignments_mm, alignments_bulge = list(), list()
-    alignments_mm.append(('+', 'standard', regex.search(query_regex_standard, window_sequence, regex.BESTMATCH)))
-    alignments_mm.append(('-', 'standard', regex.search(query_regex_standard, reverseComplement(window_sequence), regex.BESTMATCH)))
-    alignments_bulge.append(('+', 'gapped', regex.search(query_regex_gap, window_sequence, regex.BESTMATCH)))
-    alignments_bulge.append(('-', 'gapped', regex.search(query_regex_gap, reverseComplement(window_sequence), regex.BESTMATCH)))
+    alignments = list()
+    alignments.append(('+', 'standard', regex.search(query_regex_standard, window_sequence, regex.BESTMATCH)))
+    alignments.append(('-', 'standard', regex.search(query_regex_standard, reverseComplement(window_sequence),
+                                                     regex.BESTMATCH)))
+    alignments.append(('+', 'gapped', regex.search(query_regex_gap, window_sequence, regex.BESTMATCH)))
+    alignments.append(('-', 'gapped', regex.search(query_regex_gap, reverseComplement(window_sequence),
+                                                   regex.BESTMATCH)))
 
-    lowest_distance_score, lowest_mismatch = 100, max_score + 1
-    chosen_alignment_b, chosen_alignment_m, chosen_alignment_strand_b, chosen_alignment_strand_m = None, None, '', ''
+    lowest_distance_score = 100
+    chosen_alignment = None
+    chosen_alignment_strand = None
+    for i, aln in enumerate(alignments):
+        strand, alignment_type, match = aln
+        if match != None:
+            substitutions, insertions, deletions = match.fuzzy_counts
+            distance_score = substitutions + (insertions + deletions) * 3
+            if distance_score < lowest_distance_score:
+                chosen_alignment = match
+                chosen_alignment_strand = strand
+                lowest_distance_score = distance_score
 
-    # Use regex to find the best match allowing only for mismatches
-    for aln_m in alignments_mm:
-        strand_m, alignment_type_m, match_m = aln_m
-        if match_m != None:
-            mismatches, insertions, deletions = match_m.fuzzy_counts
-            if mismatches < lowest_mismatch:
-                chosen_alignment_m = match_m
-                chosen_alignment_strand_m = strand_m
-                lowest_mismatch = mismatches
+    if chosen_alignment:
+        match_sequence = chosen_alignment.group()
+        match_substitutions, match_insertions, match_deletions = chosen_alignment.fuzzy_counts
+        distance = sum(chosen_alignment.fuzzy_counts)
+        length = len(match_sequence)
 
-    # Use regex to find the best match allowing for gaps, so that its edit distance is strictly lower than the
-    # total number of mismatches of the sequence founded (if any) allowing only for mismatches.
-    for aln_b in alignments_bulge:
-        strand_b, alignment_type_b, match_b = aln_b
-        if match_b != None:
-            substitutions, insertions, deletions = match_b.fuzzy_counts
-            if insertions or deletions:
-                distance_score = substitutions + (insertions + deletions) * 3
-                edistance = substitutions + insertions + deletions
-                if distance_score < lowest_distance_score and edistance < lowest_mismatch:
-                    chosen_alignment_b = match_b
-                    chosen_alignment_strand_b = strand_b
-                    lowest_distance_score = distance_score
-
-    if chosen_alignment_m:
-        offtarget_sequence_no_bulge = chosen_alignment_m.group()
-        mismatches = chosen_alignment_m.fuzzy_counts[0]
-        start_no_bulge = chosen_alignment_m.start()
-        end_no_bulge = chosen_alignment_m.end()
-    else:
-        offtarget_sequence_no_bulge, mismatches, start_no_bulge, end_no_bulge, chosen_alignment_strand_m = '', '', '', '', ''
-
-    bulged_offtarget_sequence, score, length, substitutions, insertions, deletions, bulged_start, bulged_end, realigned_target = \
-        '', '', '', '', '', '', '', '', 'none'
-    if chosen_alignment_b:
-        realigned_target, bulged_offtarget_sequence = realignedSequences(targetsite_sequence, chosen_alignment_b, max_score)
-        if bulged_offtarget_sequence:
-            length = len(chosen_alignment_b.group())
-            substitutions, insertions, deletions = chosen_alignment_b.fuzzy_counts
-            score = substitutions + (insertions + deletions) * 3
-            bulged_start = chosen_alignment_b.start()
-            bulged_end = chosen_alignment_b.end()
+        start = chosen_alignment.start()
+        end = chosen_alignment.end()
+        path = os.path.dirname(os.path.abspath(__file__))
+        if match_insertions or match_deletions:
+            realigned_match_sequence, realigned_target = nw.global_align(match_sequence, targetsite_sequence,
+                                                                         gap_open=-10, gap_extend=-100,
+                                                                         matrix='{0}/NUC_SIMPLE'.format(path))
+            return [realigned_match_sequence, distance, length, chosen_alignment_strand, start, end, realigned_target]
         else:
-            chosen_alignment_strand_b = ''
+            return [match_sequence, distance, length, chosen_alignment_strand, start, end, targetsite_sequence]
 
-    return [offtarget_sequence_no_bulge, mismatches, len(offtarget_sequence_no_bulge), chosen_alignment_strand_m, start_no_bulge, end_no_bulge,
-            realigned_target,
-            bulged_offtarget_sequence, length, score, substitutions, insertions, deletions, chosen_alignment_strand_b, bulged_start, bulged_end]
+    else:
+        return [''] * 6 + ['none']
 
 
 """ Get sequences from some reference genome
