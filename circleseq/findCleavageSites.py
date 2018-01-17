@@ -225,7 +225,7 @@ def output_alignments(narrow_ga, ga_windows, reference_genome, target_sequence, 
             window_sequence = get_sequence(reference_genome, iv.chrom, iv.start - search_radius, iv.end + search_radius)
 
             sequence, distance, length, strand, target_start_relative, target_end_relative, realigned_target = \
-                alignSequences(target_sequence, window_sequence, max_errors=mismatch_threshold)
+                alignSequences(target_sequence, window_sequence, max_score=mismatch_threshold)
 
             # get genomic coordinates of sequences
             if strand == "+":
