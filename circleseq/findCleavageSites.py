@@ -277,7 +277,7 @@ def output_alignments(narrow_ga, ga_windows, reference_genome, target_sequence, 
     outfile_matched = '{0}_identified_matched.txt'.format(out)
 
     o1 = open(outfile_matched, 'w')
-    print('Chromosome', 'Start', 'End', 'Name', 'ReadCount', 'Strand'  # 0:5
+    print('Chromosome', 'Start', 'End', 'Name', 'ReadCount', 'Strand',  # 0:5
           'WindowName', 'WindowChromosome', 'MappingPositionStart', 'MappingPositionEnd', 'WindowSequence',  # 6:10
           'Site.Sequence', 'Site.Distance',  'Site.Length',  # 11:13
           'FileName', 'Cell', 'Targetsite', 'FullName', 'TargetSequence', 'RealignedTargetSequence',  # 14:19
